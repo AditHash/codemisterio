@@ -4,14 +4,15 @@
 
 ## Goal
 
-Build a trustworthy, local-first, open-source-intended **agentic coding CLI** with a replaceable model layer and a CodeMisterio-owned harness. The first test of success is whether it can take a small repository task, inspect and modify relevant files, execute verification, and accurately report what happened.
+Build a trustworthy, local-first, open-source-intended **agentic coding CLI powered by LangChain Deep Agents**. CodeMisterio owns the user experience, live evidence-based activity journal, tool/backend policies and extra coding tools; **Deep Agents owns the agent loop, planning, context, subagents and graph state**. The first test of success is whether it can take a small repository task, inspect and modify relevant files, execute verification, and accurately report what happened.
 
-The core loop and permission model take priority over elaborate TUI, subagents and desktop automation. **A useful built-in toolset ships in v0.1; MCP server integration is a committed v0.2 milestone.** Both share one tool registry and permission pipeline.
+**Real-time, verifiable step-by-step CLI output is a v0.1 requirement**, not a future UI enhancement. A useful built-in coding toolset ships in v0.1; MCP server integration remains a committed v0.2 milestone. All tools pass one permission and activity-reporting pipeline.
 
 ## Guiding release rules
 
 - Every milestone must be independently useful and demoable.
-- Maintain a working CLI before adding optional abstractions.
+- Keep Deep Agents as the single primary agent runtime; extend it via documented middleware/backends/tools.
+- Every meaningful tool action must emit truthful activity events in the CLI; never replace operational evidence with generated narrative.
 - New provider integrations must pass the same tool-calling contract tests.
 - Avoid claims of “autonomous” success without actual verification evidence.
 - Paid API tests must be optional; default CI runs offline with fakes.
@@ -29,53 +30,63 @@ The core loop and permission model take priority over elaborate TUI, subagents a
 - [ ] Add `pyproject.toml`, `src/`, `tests/` and packaging metadata once implementation begins.
 - [ ] Add formatting, linting, type checking and test commands.
 - [ ] Add offline CI for tests and basic package build.
+- [ ] Pin/test compatible LangChain, Deep Agents and LangGraph versions with a minimal streaming smoke test.
 - [ ] Document security reporting and credential-handling expectations.
 
 **Gate:** a fresh contributor can install the package in development mode, run offline checks and understand the roadmap. Documentation alone does not satisfy the gate.
 
 ## Milestone 1 — v0.1: A real coding CLI
 
-**Scope:** one reliable agent, one provider, one workspace, sequential execution.
+**Scope:** a working Deep Agents coding CLI with one tested model, one workspace, sequential tool execution and a live, evidence-backed activity timeline.
 
-### CLI and agent runtime
+### CLI and Deep Agents runtime
 
-- [ ] Implement `codemisterio` executable with help, version and a prompt command.
-- [ ] Implement an interactive text session (rich TUI not required).
-- [ ] Build the core model -> tool call -> result -> model loop with a maximum step count.
-- [ ] Stream assistant/tool status and support Ctrl-C cancellation.
-- [ ] Add tool call and tool result schemas, typed errors, timeouts and output truncation.
-- [ ] Add one supported model provider with real API tool calling.
-- [ ] Separate provider SDK types from core state.
-- [ ] Handle provider errors, rate limits and malformed tool calls without losing the session.
+- [ ] Implement `codemisterio` executable with help, version and interactive prompt mode.
+- [ ] Integrate `create_deep_agent` with one real LangChain chat model, explicit workspace/backend and coding-specific system prompt.
+- [ ] Use tested Deep Agents middleware for filesystem, context management, approvals and optional todo planning. Avoid writing a second tool-call loop.
+- [ ] Consume LangGraph streaming events for model text, tool status and graph/todo updates; support cancellation.
+- [ ] Add tool/backend instrumentation to emit requested, started, completed, failed and denied states.
+- [ ] Build a **Rich real-time activity feed** showing every meaningful read/search/command/edit/test event with actual tool status.
+- [ ] Implement **before/after verified file-change events**: created, edited with real hunk line numbers, deleted and renamed when provable.
+- [ ] Implement an approval UI that remains responsive while streaming and clearly shows exact target paths/commands.
+- [ ] Support structured JSONL activity output and plain-text non-TTY fallback.
+- [ ] Stream foreground process output, exit code, elapsed time and tool errors without hiding failures.
+- [ ] Introduce a minimal **managed development-process lifecycle** (start, stop, restart) with actual PID/process state and separate health-check result.
+- [ ] Bound agent execution: time/cost where available, max steps, failure/cancellation handling and useful completion status.
 
 ### Tools and safe editing
 
-- [ ] Resolve a repository root and operate within an explicit workspace.
+- [ ] Resolve a repository root and configure a Deep Agents filesystem/shell backend with explicit workspace and trusted execution policy.
 - [ ] Implement built-ins: `files.list`, `files.read`, `files.stat`, `search.glob`, `search.grep`, `patch.apply`, `files.write`.
 - [ ] Implement bounded `shell.run` and `tests.run` with stdout/stderr, timeout, cancellation and exit status.
 - [ ] Implement read-only `git.status`, `git.diff` and `git.log`; preserve unrelated user edits.
-- [ ] Implement the unified tool registry **now**: canonical tool names, JSON Schema validation, permission classifications and structured results.
-- [ ] Publish basic tool help/listing; external MCP tools use the same registry in v0.2.
+- [ ] Implement a **Deep Agents-compatible** unified tool adapter/registry now: canonical names, JSON Schema validation, approval requirements, bounded structured results, and event hooks for Deep Agents built-ins plus CodeMisterio tools.
+- [ ] Instrument all enabled file-writing backends and tool side effects; file changes from shell commands also require scoped Git/filesystem diff inspection.
+- [ ] Publish basic tool help/listing; MCP tools use the same policy/event architecture in v0.2.
 - [ ] Add an approval gate for writes, risky commands and network side effects.
 - [ ] Block unauthorized access outside workspace, including symlink/path traversal.
 - [ ] Present an accurate final summary: files changed, commands run, tests passed/failed/not run.
 
 ### Tests and demo
 
-- [ ] Add unit tests with a deterministic fake model adapter.
+- [ ] Add offline integration/unit tests using Deep Agents and deterministic fake LangChain models and tool stubs.
 - [ ] Test tools on temporary Git repositories, including malformed requests.
-- [ ] Test cancellation, tool timeouts, rejected permissions and dirty-worktree handling.
+- [ ] Test streaming order/deduplication, event accuracy, cancellation, tool timeouts, denied permissions, dirty worktrees and secret redaction.
+- [ ] Test real diff line ranges, new/deleted-file classification, and no false positive after failed edit.
+- [ ] Test foreground command output plus managed start/stop/restart with health result distinguished from process state.
 - [ ] Create a demonstration fixture with a small Python bug and pytest regression.
 - [ ] Document supported commands, actual configuration and known limitations.
 
 **v0.1 acceptance test:**
 
 1. Launch CodeMisterio from a terminal in a small test repository.
-2. Ask it to identify and fix a failing Python test.
-3. Observe file reads, a proposed change and a scoped approval prompt.
-4. Verify CodeMisterio applies a correct patch, reruns pytest and surfaces the exit code.
-5. Confirm the report contains the diff and names any tests it could not run.
-6. Ensure denial/cancellation leaves the repository in a predictable state.
+2. Ask it to identify and fix a failing Python test, watching a **live activity timeline** rather than a spinner.
+3. Observe real file reads, an approval prompt and tool start/finish states.
+4. Verify actual edit/file creation/deletion events and exact diff hunk lines match the changed worktree.
+5. Verify pytest output streams live and the final exit code/test summary matches reality.
+6. Start/restart a managed fixture development service; show PID/lifecycle and independently checked readiness.
+7. Confirm the final report contains actual git diff and names any tests it could not run.
+8. Ensure denial/cancellation leaves the repository in a predictable state and never reports unperformed changes.
 
 The milestone is complete only when this workflow passes repeatably in automated integration tests and a real-provider smoke test.
 
@@ -169,24 +180,25 @@ The milestone is complete only when this workflow passes repeatably in automated
 
 ## Suggested first implementation issues
 
-1. **Bootstrap Python package and offline CI** — executable, type checking, formatting and tests.
-2. **Define model/tool event contracts** — typed schemas and fake adapter.
-3. **Implement agent loop** — streaming, budgets, cancellation and tool result feedback.
-4. **Implement workspace tools** — read/search/patch with containment tests.
-5. **Implement shell runner and permission decisions** — timeouts, stdout/stderr, reject/approve flows.
-6. **Implement first provider adapter** — tool calling plus a real smoke-test script.
-7. **Create bug-fixing benchmark fixture** — Python + pytest, clean and dirty worktree cases.
-8. **Document reproducible v0.1 demo** — accurate flags, limitations and results.
-9. **Design v0.2 MCP compatibility suite** — fake stdio + HTTP servers, tools/resources/prompts, malformed responses and approval denials.
-10. **Plan v0.2 tool expansion** — diagnostics, project inspection and controlled Git mutation.
+1. **Bootstrap package and offline CI** — Typer/Rich, formatting, linting, tests, pin Deep Agents/LangGraph versions.
+2. **Deep Agents smoke test** — `create_deep_agent`, fake model, one real model, streaming and interrupt demonstration.
+3. **Activity event schema + renderer** — versioned events, live CLI, JSONL, cancellation and durable journal.
+4. **Instrument filesystem backend** — before/after snapshots, diff hunks, creates/deletes, failed operations and redaction.
+5. **Shell and managed process instrumentation** — streamed output, exit status, start/stop/restart and readiness probe.
+6. **Permissions + workspace** — approval interrupts, path safety and scoped execution policy.
+7. **Baseline coding tools** — files, search, patch, Git inspection and test runner integrated into Deep Agents.
+8. **v0.1 fixture/demo** — fix a pytest bug with full live evidence and a process restart fixture.
+9. **v0.2 MCP compatibility suite** — fake stdio + HTTP servers, tools/resources/prompts, malformed responses and denials.
+10. **v0.2 tool expansion** — diagnostics, project inspection, controlled Git mutation.
 
 ## Definition of done for any feature
 
 - Implementation and tests exist, with at least one failure-path test.
 - The CLI behavior and permissions are documented.
+- Every actual mutation/command outcome has a verified activity event; wrong line numbers or fabricated process restarts block release.
 - Existing tests pass, or failures are called out explicitly.
 - User-visible outputs do not claim unperformed actions.
 - Changes respect the workspace boundary and preserve unrelated edits.
 - New dependencies have a clear reason and compatible licensing.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries, [docs/TOOLS.md](docs/TOOLS.md) for the built-in tool catalog, [docs/MCP.md](docs/MCP.md) for the MCP client contract, and [AGENTS.md](AGENTS.md) for contributor-agent guidance.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for Deep Agents integration, [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) for required CLI events, [docs/TOOLS.md](docs/TOOLS.md) for tools, [docs/MCP.md](docs/MCP.md) for MCP, and [AGENTS.md](AGENTS.md) for contributor-agent guidance.
