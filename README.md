@@ -6,7 +6,7 @@
 
 CodeMisterio aims to bring a capable software engineering agent to the terminal. It is inspired by the workflow of tools such as Claude Code, Codex and OpenCode, while aiming to give developers control over the model, execution tools, permissions and environment.
 
-**The harness is the product.** CodeMisterio should own the agent loop, context, tool registry, approvals, session state and user experience. Language models are interchangeable reasoning backends, not owners of the workflow.
+**Deep Agents is the chosen agent harness.** CodeMisterio is built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) and its LangGraph runtime. Deep Agents owns the agent loop, planning and context; CodeMisterio owns the developer-facing CLI, verified step-by-step activity tracking, coding tool integrations, permissions, MCP configuration and user experience. Language models remain selectable through LangChain integrations.
 
 ## Vision
 
@@ -18,22 +18,29 @@ Example *future* workflow (illustration, not a command that works today):
 $ codemisterio
 > Find why authentication tests fail, fix the code and verify the change.
 
-Reading project files...
-Running pytest...
-Investigating traceback...
-Proposing patch to auth/token.py...
-Approval requested for file edit...
-Running tests after patch...
-Reporting diff and test results.
+✓ Read src/auth/token.py:1–120
+→ Proposed edit src/auth/token.py:42–42
+  - if token:
+  + if token and not is_expired(token):
+? Approve file edit? [once / session / deny]
+✓ Edited src/auth/token.py (+1 −1)
+✓ Created tests/test_expired_token.py (+28 lines)
+→ Running pytest -q
+✓ pytest exited 0 — 27 tests passed
+→ Restart requested: dev-api (managed service)
+✓ Restarted dev-api (PID change confirmed)
+✓ /health returned HTTP 200
+✓ Finished — 1 modified, 1 added, 0 deleted
 ~~~
 
-The goal is not to generate code blindly. It is to close the loop between **understanding, changing, executing and validating** software.
+The goal is not to generate code blindly. It is to close the loop between **understanding, changing, executing and validating** software. **Every operation shown above is illustrative; the actual CLI must derive events from real tool execution and verified diffs/process status, not model narration.**
 
 ## Intended capabilities
 
 | Area | Direction | Status |
 | --- | --- | --- |
-| Terminal coding agent | Interactive sessions, streaming tool events, plans and explanations | Planned |
+| Terminal coding agent | Deep Agents runtime, interactive sessions, model streaming and approvals | v0.1 planned |
+| Live step-by-step activity | Exact file edits/line hunks, file adds/deletes, shell output, process starts/restarts, tests, errors and permissions | **v0.1 planned** |
 | Built-in coding tools | Files, glob/grep search, patch editing, terminal commands, Git and tests | v0.1 planned |
 | Development execution | Bounded shell commands, linting, builds and test runs | Planned |
 | Debugging and code quality | Identify bugs, write regression tests, review changes | Planned |
@@ -54,7 +61,7 @@ These are **goals**, not shipped features. Provider availability and feature par
 Rather than centering the product on a single model or narrow code-review workflow, CodeMisterio is intended as a **developer-controlled coding harness**:
 
 - **Model replaceability:** start with one real provider, then validate the interface with others. Provider-native capabilities remain optional rather than artificially flattened.
-- **Visible tool execution:** show operations, diffs, failures and verification evidence instead of only claiming success.
+- **Verified live execution:** show every meaningful operation in a chronological terminal feed—actual file paths and edited lines, added/deleted files, shell output, running processes, restarts, tests, failures and approvals. Commands and diffs are checked independently of model narration.
 - **Explicit permission boundaries:** a model's tool call does not itself authorize filesystem, terminal, network or desktop access.
 - **Extensible tool layer:** robust built-in tools first; a shared tool registry supports external MCP servers starting in v0.2 and computer-use backends later.
 - **Local-first workflow:** work in the chosen repository while preserving unrelated files and uncommitted changes.
@@ -65,26 +72,26 @@ These are design goals, not a claim that CodeMisterio currently outperforms othe
 
 ~~~text
                   CodeMisterio CLI / TUI
+                 Live Activity Stream
                            |
-                    Core Agent Harness
-               +-----------+-----------+
-               |           |           |
-          Model Router  Tool Registry  Policy Engine
-               |           |           |
-         Model adapters    |       Approvals
-               |           |
-         OpenAI / ...   Files / Git / Shell / Tests
+                   LangChain Deep Agents
+                     (LangGraph runtime)
+              +------------+-----------+
+              |            |           |
+         LangChain     Tool/Backend   Policy +
+          Models       Middleware     Approvals
                            |
-                 MCP servers (v0.2)
+                 Files/Git/Shell/Tests
+                    MCP (v0.2)
+                 Browser/desktop (later)
                            |
-                 Browser / Desktop (later)
+                Evidence collectors
+                (diffs, output, PIDs)
                            |
-                 Workspace or Sandbox
-                           |
-                Evidence + Final Report
+                   Live CLI + Journal
 ~~~
 
-The initial architecture uses a **custom Python agent loop**, with optional integration of orchestration libraries later if they provide a clear benefit. See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries, contracts, and security rules.
+The initial architecture uses **LangChain Deep Agents** with its underlying **LangGraph** state and streaming APIs; CodeMisterio adds an activity/event bridge and coding-specific execution tooling. See [ARCHITECTURE.md](ARCHITECTURE.md) for integration details and [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) for event contracts.
 
 ## Implementation direction
 
@@ -93,9 +100,10 @@ Proposed stack, subject to implementation validation:
 - **Runtime:** Python 3.12+ and asyncio.
 - **CLI:** Typer and Rich; Textual can power a richer TUI later.
 - **Schemas:** Pydantic.
-- **Model layer:** small provider adapters, initially one provider.
+- **Agent framework:** LangChain Deep Agents (`deepagents`), powered by LangGraph.
+- **Model layer:** LangChain chat model integrations, initially one tested provider.
 - **Execution:** built-in filesystem/search/patch, Git, bounded shell and tests; project-specific diagnostics as integrations.
-- **Persistence:** SQLite.
+- **Persistence:** LangGraph checkpointing plus a separate CodeMisterio event journal (SQLite if needed).
 - **UI automation (later):** Playwright for browsers; optional isolated desktop adapters.
 - **Integration (v0.2):** MCP client with local stdio and remote Streamable HTTP server support, plus explicit project-level instructions and skills.
 - **Packaging:** pyproject.toml with uv for development.
@@ -106,7 +114,7 @@ No executable package or supported installation flow exists yet.
 
 **Milestone 0 — Foundations:** project documentation, license selection, packaging, offline CI and contributor instructions.
 
-**v0.1 — Working coding CLI and built-in tools:** one real model provider, shared tool registry, file and search tools, patching, controlled shell execution, Git inspection, test validation, permissions and truthful reports.
+**v0.1 — Deep Agents coding CLI + live activity:** one tested model, Deep Agents-backed tool execution, streamed file-change evidence (including diff hunk lines), command output, managed process lifecycle, test results, approvals, cancellation and a truthful final report.
 
 **v0.2 — MCP and extensible harness:** more model adapters, local and remote MCP servers, MCP tools/resources/prompts, additional built-in tools, session persistence, context management and project instructions.
 
@@ -123,7 +131,8 @@ Detailed tasks, acceptance criteria and release gates are in [PLAN.md](PLAN.md).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — architecture, trust boundaries, tool interfaces and design decisions.
 - [PLAN.md](PLAN.md) — phased milestones, tasks and acceptance tests.
 - [AGENTS.md](AGENTS.md) — guidance for coding agents and contributors working on this repository.
-- [docs/TOOLS.md](docs/TOOLS.md) — built-in tool catalog and uniform execution contracts.
+- [docs/TOOLS.md](docs/TOOLS.md) — Deep Agents-compatible tool catalog and uniform execution contracts.
+- [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) — required step-by-step CLI events, actual diff/process evidence and rendering modes.
 - [docs/MCP.md](docs/MCP.md) — MCP client design, server configuration, transports and security.
 
 ## Safety model
@@ -151,4 +160,4 @@ The immediate target is a minimal coding CLI that can:
 5. Apply a patch and rerun verification.
 6. Report the actual results and Git diff.
 
-**Success means a reproducible, validated engineering task — not merely plausible generated code.**
+**Success means a reproducible, validated engineering task with a live, inspectable execution timeline — not merely plausible generated code.**
