@@ -6,7 +6,7 @@ This file guides AI coding assistants and contributors making changes **to this 
 
 CodeMisterio is an **agentic coding CLI built on LangChain Deep Agents and LangGraph**, not merely a code-review tool. Long-term capabilities include repository exploration, editing, terminal execution, testing, debugging and optional browser/desktop computer use.
 
-**Current state:** documentation-first. Do not assume package files, CLI entry points, tests, CI workflows or released distributions exist until you inspect the worktree.
+**Current state:** early Python CLI implementation. The repository now has `pyproject.toml`, `src/codemisterio/`, `tests/` and GitHub Actions. The agent CLI is a development preview: actual model integration, shell/test tools and MCP are not verified or available yet. Inspect the worktree before assuming any release capability.
 
 Read [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PLAN.md](PLAN.md), [docs/TOOLS.md](docs/TOOLS.md), [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) and [docs/MCP.md](docs/MCP.md) before architecture-changing work.
 
