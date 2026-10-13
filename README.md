@@ -2,11 +2,31 @@
 
 **An open-source-intended, model-agnostic agentic coding CLI and harness.**
 
-> **Project status: design and planning.** This repository currently contains specifications, not a runnable coding agent. Installation instructions and executable CLI examples will be added after the first working release. A license has not yet been selected, so the repository should not be described as licensed open source yet.
+> **Project status: early implementation preview (v0.1 alpha).** A CLI entry point and offline-tested activity/file-snapshot components are present. Actual Deep Agents/provider calls have not been smoke-tested in this environment because PyPI installation was unavailable. There is no production-ready shell runner, MCP client or computer use yet. An OSI license still needs to be selected.
 
 CodeMisterio aims to bring a capable software engineering agent to the terminal. It is inspired by the workflow of tools such as Claude Code, Codex and OpenCode, while aiming to give developers control over the model, execution tools, permissions and environment.
 
 **Deep Agents is the chosen agent harness.** CodeMisterio is built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) and its LangGraph runtime. Deep Agents owns the agent loop, planning and context; CodeMisterio owns the developer-facing CLI, verified step-by-step activity tracking, coding tool integrations, permissions, MCP configuration and user experience. Language models remain selectable through LangChain integrations.
+
+## Try the first development preview
+
+Install Python 3.12+ and uv, then in a fresh checkout:
+
+~~~bash
+uv sync --extra openai --extra dev
+uv run codemisterio version
+uv run pytest -q
+~~~
+
+For an actual model task, configure your API credentials in your shell (for example, `OPENAI_API_KEY`), then run:
+
+~~~bash
+uv run codemisterio run "Inspect the repository and suggest improvements" --workspace . --model openai:gpt-5.5
+~~~
+
+The CLI is **read-only by default**, with Deep Agents `ls`, `read_file`, `glob`, `grep` tools. Add `--allow-edits` for per-call approvals before `write_file` and `edit_file`. `--jsonl` emits machine-readable tool/activity events but is read-only. Arbitrary shell execution, restarting services, browser/desktop automation and MCP are **not yet implemented**. Repository snapshots can miss changes in large, binary, generated or ignored files.
+
+See [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) for installation and limitations. The CLI currently has 12 passing offline tests; real model integration is unverified until its dependencies and credentials are exercised.
 
 ## Vision
 
@@ -39,9 +59,9 @@ The goal is not to generate code blindly. It is to close the loop between **unde
 
 | Area | Direction | Status |
 | --- | --- | --- |
-| Terminal coding agent | Deep Agents runtime, interactive sessions, model streaming and approvals | v0.1 planned |
-| Live step-by-step activity | Exact file edits/line hunks, file adds/deletes, shell output, process starts/restarts, tests, errors and permissions | **v0.1 planned** |
-| Built-in coding tools | Files, glob/grep search, patch editing, terminal commands, Git and tests | v0.1 planned |
+| Terminal coding agent | Deep Agents-backed CLI command, activity events and per-write approvals | Early implementation; real-provider test pending |
+| Live step-by-step activity | Tool lifecycle and observed text-file creates/edits/deletes exist; streaming shell/process/test output remains planned | Partial v0.1 |
+| Built-in coding tools | Deep Agents filesystem read/search and opt-in writes included; terminal, Git and tests still planned | Partial v0.1 |
 | Development execution | Bounded shell commands, linting, builds and test runs | Planned |
 | Debugging and code quality | Identify bugs, write regression tests, review changes | Planned |
 | Provider independence | Model adapters for OpenAI, Anthropic and potentially Gemini/local models | Planned |
@@ -108,7 +128,7 @@ Proposed stack, subject to implementation validation:
 - **Integration (v0.2):** MCP client with local stdio and remote Streamable HTTP server support, plus explicit project-level instructions and skills.
 - **Packaging:** pyproject.toml with uv for development.
 
-No executable package or supported installation flow exists yet.
+A development package and CLI entry point are present, but end-to-end Deep Agents/model integration is not yet verified.
 
 ## Development roadmap
 
@@ -133,6 +153,7 @@ Detailed tasks, acceptance criteria and release gates are in [PLAN.md](PLAN.md).
 - [AGENTS.md](AGENTS.md) — guidance for coding agents and contributors working on this repository.
 - [docs/TOOLS.md](docs/TOOLS.md) — Deep Agents-compatible tool catalog and uniform execution contracts.
 - [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) — required step-by-step CLI events, actual diff/process evidence and rendering modes.
+- [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) — initial Python setup, preview commands, limitations and next steps.
 - [docs/MCP.md](docs/MCP.md) — MCP client design, server configuration, transports and security.
 
 ## Safety model
