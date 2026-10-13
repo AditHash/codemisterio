@@ -34,13 +34,15 @@ The goal is not to generate code blindly. It is to close the loop between **unde
 | Area | Direction | Status |
 | --- | --- | --- |
 | Terminal coding agent | Interactive sessions, streaming tool events, plans and explanations | Planned |
-| Repository tools | Read, search, patch and inspect Git diffs | Planned |
+| Built-in coding tools | Files, glob/grep search, patch editing, terminal commands, Git and tests | v0.1 planned |
 | Development execution | Bounded shell commands, linting, builds and test runs | Planned |
 | Debugging and code quality | Identify bugs, write regression tests, review changes | Planned |
 | Provider independence | Model adapters for OpenAI, Anthropic and potentially Gemini/local models | Planned |
 | Policy and permissions | Workspace boundaries, approvals and auditable actions | Planned |
 | Sessions and context | Persistence, context budgeting and controlled resumption | Planned |
-| Extensions | MCP, repository instructions and reusable skills | Later milestone |
+| MCP server integration | Local stdio and remote Streamable HTTP servers; tools, resources, prompts and server management | v0.2 planned |
+| Extended tool catalog | Project discovery, diagnostics, controlled Git operations and HTTP fetch | v0.2 planned |
+| Repository instructions and skills | Explicitly loaded guidance and reusable skills under safety policy | v0.2 planned |
 | Browser validation | Playwright, screenshots, console errors, UI testing | Later milestone |
 | Desktop computer use | Optional, sandboxed mouse/keyboard/window control | Later milestone |
 | Advanced agents | Bounded subagents and parallel work | Later milestone |
@@ -54,7 +56,7 @@ Rather than centering the product on a single model or narrow code-review workfl
 - **Model replaceability:** start with one real provider, then validate the interface with others. Provider-native capabilities remain optional rather than artificially flattened.
 - **Visible tool execution:** show operations, diffs, failures and verification evidence instead of only claiming success.
 - **Explicit permission boundaries:** a model's tool call does not itself authorize filesystem, terminal, network or desktop access.
-- **Extensible tool layer:** deterministic development tooling first, MCP and computer-use backends later.
+- **Extensible tool layer:** robust built-in tools first; a shared tool registry supports external MCP servers starting in v0.2 and computer-use backends later.
 - **Local-first workflow:** work in the chosen repository while preserving unrelated files and uncommitted changes.
 
 These are design goals, not a claim that CodeMisterio currently outperforms other agents.
@@ -73,7 +75,9 @@ These are design goals, not a claim that CodeMisterio currently outperforms othe
                |           |
          OpenAI / ...   Files / Git / Shell / Tests
                            |
-                MCP / Browser / Desktop (later)
+                 MCP servers (v0.2)
+                           |
+                 Browser / Desktop (later)
                            |
                  Workspace or Sandbox
                            |
@@ -90,10 +94,10 @@ Proposed stack, subject to implementation validation:
 - **CLI:** Typer and Rich; Textual can power a richer TUI later.
 - **Schemas:** Pydantic.
 - **Model layer:** small provider adapters, initially one provider.
-- **Execution:** Git, bounded local commands, pytest and other project-specific tools.
+- **Execution:** built-in filesystem/search/patch, Git, bounded shell and tests; project-specific diagnostics as integrations.
 - **Persistence:** SQLite.
 - **UI automation (later):** Playwright for browsers; optional isolated desktop adapters.
-- **Integration (later):** MCP and project-level agent instructions.
+- **Integration (v0.2):** MCP client with local stdio and remote Streamable HTTP server support, plus explicit project-level instructions and skills.
 - **Packaging:** pyproject.toml with uv for development.
 
 No executable package or supported installation flow exists yet.
@@ -102,13 +106,15 @@ No executable package or supported installation flow exists yet.
 
 **Milestone 0 — Foundations:** project documentation, license selection, packaging, offline CI and contributor instructions.
 
-**v0.1 — Working coding CLI:** one real model provider, single-agent tool loop, repository search/read/patch, controlled shell execution, test validation, permissions and truthful reports.
+**v0.1 — Working coding CLI and built-in tools:** one real model provider, shared tool registry, file and search tools, patching, controlled shell execution, Git inspection, test validation, permissions and truthful reports.
 
-**v0.2 — Extensible harness:** more model adapters, MCP, session persistence, context management and project instructions.
+**v0.2 — MCP and extensible harness:** more model adapters, local and remote MCP servers, MCP tools/resources/prompts, additional built-in tools, session persistence, context management and project instructions.
 
 **v0.3 — Browser and computer use:** Playwright-based browser tests, screenshots and optional sandboxed desktop interactions.
 
 **v0.4 — Advanced engineering:** richer TUI, subagents, isolated worktrees, parallel workflows and deeper software validation.
+
+**v1.0 — Stable open-source release:** an OSI-approved license, security review, cross-platform verification, packaging, documented compatibility and stable interfaces.
 
 Detailed tasks, acceptance criteria and release gates are in [PLAN.md](PLAN.md).
 
@@ -117,6 +123,8 @@ Detailed tasks, acceptance criteria and release gates are in [PLAN.md](PLAN.md).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — architecture, trust boundaries, tool interfaces and design decisions.
 - [PLAN.md](PLAN.md) — phased milestones, tasks and acceptance tests.
 - [AGENTS.md](AGENTS.md) — guidance for coding agents and contributors working on this repository.
+- [docs/TOOLS.md](docs/TOOLS.md) — built-in tool catalog and uniform execution contracts.
+- [docs/MCP.md](docs/MCP.md) — MCP client design, server configuration, transports and security.
 
 ## Safety model
 
@@ -137,7 +145,7 @@ The project is at an early design stage. Discussions, issues and focused impleme
 The immediate target is a minimal coding CLI that can:
 
 1. Inspect a small Python repository.
-2. Find a failing pytest test.
+2. Use built-in file, search, Git and terminal tools to find a failing pytest test.
 3. Explain and propose a targeted fix.
 4. Request approval before changing files.
 5. Apply a patch and rerun verification.
