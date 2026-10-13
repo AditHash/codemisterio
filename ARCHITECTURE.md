@@ -2,98 +2,95 @@
 
 > **Status:** Proposed architecture, not a description of a working implementation. Changes to these choices should be recorded as short design decisions in this document or linked issues.
 
-## 1. Product boundary
+## 1. Product boundary and framework decision
 
-CodeMisterio is a local-first, extensible **agentic coding CLI and harness**. It is not limited to code review: it should be able to understand repositories, plan changes, edit code, execute development tools, observe results, debug failures, and explain its work.
+CodeMisterio is a local-first, extensible **agentic coding CLI** that inspects codebases, modifies files, executes development commands, runs tests, manages opt-in development processes, and reports verified results in real time.
 
-The harness owns the agent loop, permissions, tool execution, context management, sessions, and user experience. Models supply reasoning and tool-call decisions through provider adapters. No individual model vendor or agent framework should be required by the core.
+**Architecture decision (October 2026):** LangChain **Deep Agents** is the main agent runtime. CodeMisterio will **not** implement a competing custom tool-calling loop. Deep Agents provides planning options, context management, filesystem and shell abstractions, skills, subagents, middleware and human-in-the-loop flows. Its underlying **LangGraph** runtime supplies streaming and checkpointing. **LangChain** provides model integrations. CodeMisterio adds a coding-specific CLI, model/config policy, extra tools, MCP integrations, process management, file-change evidence, live activity timeline and user-centered workflows.
 
-Primary interface: terminal CLI; optional rich TUI. Headless automation, IDE integration, remote execution, and multi-agent orchestration are future capabilities, not MVP requirements.
+Four reference repositories:
+- [LangChain](https://github.com/langchain-ai/langchain) — model integrations and tooling.
+- [Deep Agents](https://github.com/langchain-ai/deepagents) — primary agent framework.
+- [LangGraph CUA](https://github.com/langchain-ai/langgraph-cua-py) — optional computer-use backend, not the core runtime.
+- [Open SWE](https://github.com/langchain-ai/open-swe) — reference implementation of Deep Agents-based engineering automation; not an additional required dependency.
+
+Primary interface: interactive local CLI; richer TUI, remote sandboxes and headless automation are later phases. The runtime must remain useful without MCP servers, browser automation or a hosted service.
 
 ## 2. Core principles
 
-1. **Harness-first:** control the agent lifecycle in CodeMisterio's own Python code.
-2. **Provider independence, not lowest-common-denominator behavior:** normalize common events and tools; keep optional provider-native features behind capability checks.
-3. **Deterministic before probabilistic:** use Git, language servers, parsers, linters, test runners, and Playwright when they are more precise than visual reasoning.
-4. **Safe by default:** a model's request is never authorization to execute a dangerous action.
-5. **Local-first and inspectable:** users can see proposed edits, tool calls, approvals, and session state.
-6. **Evidence over confidence:** test results, diffs, logs, and reproducible steps support claims.
-7. **Incremental delivery:** one reliable agent loop precedes subagents, remote sandboxes, and desktop control.
-8. **Built-ins plus MCP:** first-class coding tools and MCP-discovered tools run through one registry, permission engine and result contract.
+1. **Use Deep Agents, extend via supported APIs:** customize prompts, middleware, backends, tools, skills, model selection, approvals and checkpoints before considering a fork.
+2. **Inspectable, evidence-driven CLI:** stream significant actions as they happen; never substitute LLM narration for verified file/process state.
+3. **Provider-agnostic by default:** use LangChain chat models and detect feature availability rather than inventing parity across vendors.
+4. **One execution policy:** Deep Agents native tools, CodeMisterio built-ins and MCP tools must all respect workspace/sandbox permissions.
+5. **Deterministic tools first:** Git diffs, shell exit codes, pytest reports and Playwright assertions beat unverified model assumptions.
+6. **Preserve developer control:** explicit workspace, visible edits, approval interrupts, cancellation, managed process lifecycle and truthful summaries.
+7. **No premature duplication:** reuse Deep Agents context management, filesystem tools, task orchestration and state rather than reimplementing them.
+8. **Cross-platform, extensible delivery:** console first, richer TUI and computer use later. Design the event bus for those consumers now.
 
 ## 3. System overview
 
 ~~~text
-User / CLI / TUI
-        |
-        v
-CLI command + session controller
-        |
-        v
-+---------------- CodeMisterio Harness ----------------+
-| Agent loop / run state / cancellation                 |
-| Prompt + context assembler / compaction               |
-| Provider router + feature negotiation                 |
-| Tool registry / execution scheduler                   |
-| Permissions / user approval / audit trail             |
-| Session persistence / event streaming                 |
-+-------------+------------------+---------------------+
-              |                  |
-      Model adapters       Tool execution
-      - OpenAI             - repo files/search/patch
-      - Anthropic          - shell/Git/build/tests
-      - Gemini (later)     - MCP client (v0.2)
-      - Ollama (later)     - browser (later)
-                           - desktop (later)
-              |                  |
-              +--------+---------+
-                       v
-            Results + validation evidence
-                       |
-                       v
-              User-visible summary
+User -> CodeMisterio CLI / Rich live renderer
+                 |
+                 v
+     CodeMisterio Session + Activity Bridge
+     (event correlation, journal, safety, display)
+                 |
+                 v
+         LangChain Deep Agents
+      create_deep_agent(...) runtime
+           /       |        \
+    LangChain   LangGraph    Deep Agents
+     models     streaming    middleware:
+                checkpoint    - filesystem
+                interrupts    - planning (as configured)
+                              - context
+                              - skills/subagents
+                 |
+           Tool / backend execution
+           /        |          \
+     Deep Agents   CodeMisterio   MCP client
+     built-ins     wrapped tools  (v0.2)
+           \        |          /
+            Permission/Execution Policy
+                      |
+       Filesystem + Shell + Git + Tests
+       Managed processes (incremental)
+       Browser / Desktop (later)
+                      |
+     Verified ActivityEvent + evidence
+                      |
+       CLI / JSONL / stored event journal
 ~~~
 
-The model sees tools exposed by the harness. The harness validates requested arguments, checks the permission policy, executes the operation, captures bounded results, and returns observations to the model.
+**Trust boundary:** even if Deep Agents allows a tool to run, CodeMisterio must enforce approved execution and resource scope at a lower-level backend/executor boundary. LangGraph stream messages inform progress; instrumented file/process tools produce evidence.
 
 ## 4. One agent run
 
-A coding task is a sequence of **model turns** and **tool results** controlled by the harness.
-
 ~~~text
-Receive task
-  -> resolve workspace and permissions
-  -> load session/context
-  -> select compatible provider and tools
-  -> request model response (stream events to UI)
-  -> if tool calls:
-       validate arguments
-       evaluate risk and request approval if needed
-       execute with timeouts and resource bounds
-       redact/truncate observations where appropriate
-       append results to session
-       compact context if necessary
-       continue loop
-  -> else:
-       verify claims against available evidence
-       present changes, tests, warnings and final answer
+User request
+  -> initialize workspace, provider/model and approved tools
+  -> build create_deep_agent(...) with CodeMisterio middleware/backends
+  -> subscribe to LangGraph event/stream output
+  -> model plans and invokes tools via Deep Agents
+  -> permission interrupt/authorization before privileged operations
+  -> instrumented tool/backend executes and verifies effects
+  -> normalize model/graph/tool updates into ActivityEvent records
+  -> persist and stream evidence to CLI continuously
+  -> graph loops as required; checkpoints enable recovery
+  -> independent final git diff/test/process checks
+  -> truthful user-facing task summary
 ~~~
 
-Hard stops: user cancellation, maximum turns, token/cost budget, execution timeout, repeated tool failure, or unrecoverable provider error. Stop states must be distinguishable from successful completion.
+The actual tool-calling loop, subagent lifecycle and context management belong to **Deep Agents**, not a separate CodeMisterio implementation. Use tested public extension points. Avoid depending on internal LangChain event names without contract tests.
 
-The agent may propose a plan, but a separate planner or mandatory plan phase is **not** required for simple tasks.
+### State and event contracts
 
-### Minimal state contracts (conceptual)
+Deep Agents/LangGraph owns graph and checkpointed conversation state. CodeMisterio separately owns versioned user-facing **ActivityEvent** records and tool-evidence artifacts, including run/session IDs, tool-call correlation ID, event type, status, timestamp, actor/subagent, workspace-relative path, actual diff hunks, process state, stdout/stderr artifacts, exit code and permission outcome.
 
-- **Run:** ID, workspace, user request, selected provider/model, operating mode, budgets, status.
-- **Message:** role, text and/or multimodal parts, optional reasoning/metadata as supported.
-- **ToolCall:** ID, canonical tool name, validated arguments, requested scope.
-- **ToolResult:** call ID, status, bounded stdout/stderr or structured data, duration, artifacts.
-- **Event:** session/run IDs, event type, timestamp, payload for CLI/TUI streaming.
-- **Approval:** call/operation ID, risk category, decision, scope and provenance.
-- **ModelCapabilities:** tool calls, streaming, vision, structured outputs, native computer use, context limit (if known).
+See [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) for the full lifecycle/status model, structured JSON event example and acceptance tests. Actual events must distinguish requested/started/succeeded/failed/denied/unverified.
 
-Define these contracts explicitly and version persisted representations before adding multiple providers.
+**Streaming:** prefer the current typed LangGraph event API where supported; compatibility path is `astream(..., stream_mode=["messages","updates","custom"], version="v2")` with an explicit version gate. Model tokens and high-level progress are not proof of filesystem changes. Hide private chain-of-thought and redact secrets.
 
 ## 5. Component responsibilities
 
@@ -104,27 +101,15 @@ Define these contracts explicitly and version persisted representations before a
 - CLI must function without a TUI, to support CI and accessibility.
 - Command names are proposals until implemented; avoid publishing installation instructions that do not work.
 
-### Agent loop
+### Deep Agents runtime and provider integration
 
-- CodeMisterio owns tool-call iteration, budgets, retries, interrupts, and completion criteria.
-- Agent run state must be independent of any provider SDK response object.
-- Initial execution is sequential and predictable. Parallel reads and subagents arrive only after permissions and cancellation are reliable.
-
-### Provider layer
-
-Implement a small adapter protocol such as:
-
-~~~python
-class ModelAdapter(Protocol):
-    async def generate(self, request: ModelRequest) -> AsyncIterator[ModelEvent]:
-        ...
-    def capabilities(self, model: str) -> ModelCapabilities:
-        ...
-~~~
-
-The exact types are to be finalized during implementation. Provider adapters translate request/response formats, authentication, tool definitions and results, token usage, and provider-specific errors. The core should not import provider SDKs directly.
-
-Treat *native computer-use APIs*, reasoning traces, prompt caching, and model-specific modalities as optional extensions. Never silently claim equivalent behavior across providers.
+- Instantiate the coding agent with `create_deep_agent`, an explicit LangChain chat model, workspace-aware backend, optional planning middleware, and configurable permission/approval policy.
+- Prefer Deep Agents' supplied filesystem, shell, subagent, context, skills and checkpoint features over duplicate implementations.
+- Deep Agents task planning is configuration-dependent and may be opt-in; enable explicit todo tracking for complex engineering tasks where helpful.
+- Use LangChain chat model integrations for OpenAI, Anthropic, Gemini, and compatible/local providers as they are tested. Preserve model-specific capabilities and limitations.
+- Stream through LangGraph to the CodeMisterio activity bridge; additional tools should emit structured custom events from trusted execution wrappers.
+- **Safety:** Deep Agents' LocalShellBackend executes host shell commands and is **not sandbox isolation**, even when `virtual_mode=True`. Use the correct path/permission guards, approval middleware and eventually isolated containers/VMs; do not imply local host safety is guaranteed.
+- Always test the pinned versions of Deep Agents, LangChain and LangGraph together. Project code should use public extension points rather than forked private internals.
 
 ### Tool layer
 
@@ -174,17 +159,13 @@ Agent loop
 
 See [docs/MCP.md](docs/MCP.md) for server management, transports, authentication, and acceptance tests.
 
-### Context and memory
+### Context, checkpointing and memory
 
-- Read only the files needed for the task; don't inject an entire repository blindly.
-- Track a bounded working set of relevant files, current plan, tool summaries, errors, and important user constraints.
-- Separate transient run context from persistent user-approved project knowledge.
-- When compaction is needed, preserve unfinished work, file paths, decisions, pending approvals, and error evidence.
-- Repository instructions in `AGENTS.md` are **project data**, not an override of safety policy or user authorization.
-
-### Session persistence
-
-SQLite is a suitable first implementation for runs, messages, tool events, approvals and usage. Store schema versions and support migrations. Never store raw API keys; redact secrets in logs. Persist enough metadata to resume safely, but do not automatically repeat a previously approved destructive action.
+- Deep Agents supplies context compression, subagent separation, file-backed context and optional persistent memory; configure instead of rebuilding.
+- LangGraph checkpointing provides graph thread state. CodeMisterio must still track an independent **activity journal** so a resumed session does not falsely re-report actions as newly executed.
+- Persist user-chosen model/config, workspace and permission state where needed. Do not persist raw API keys.
+- For resumed tool calls, deduplicate side effects using tool-call IDs and idempotency records, not just conversation history.
+- External `AGENTS.md` guidance, skills, files and MCP resources are lower-trust than user instructions and tool security rules.
 
 ### Permissions and trust boundaries
 
@@ -245,45 +226,54 @@ codemisterio/
 ├── ARCHITECTURE.md
 ├── PLAN.md
 ├── AGENTS.md
-├── pyproject.toml                 # future
-├── src/codemisterio/              # future
-│   ├── cli/
-│   ├── core/                      # loop, run state, context, sessions
-│   ├── providers/                 # model SDK adapters
-│   ├── tools/                     # registry + built-in tools
-│   │   └── computer/              # later
-│   ├── security/                  # permissions, scope, auditing
-│   ├── mcp/                       # later
-│   └── tui/                       # later
-└── tests/                         # future
+├── docs/
+│   ├── TOOLS.md
+│   ├── MCP.md
+│   └── ACTIVITY_STREAM.md
+├── pyproject.toml                       # future
+├── src/codemisterio/                    # future
+│   ├── cli/                             # Rich renderer, input, JSONL
+│   ├── runtime/                         # Deep Agents factory / LangGraph bridge
+│   ├── activity/                        # events, journal, diff, evidence
+│   ├── tools/                           # extra tools, wrappers, process manager
+│   ├── providers/                       # model selection/config, not replacement agent loop
+│   ├── security/                        # permissions/scope/sandbox policy
+│   ├── mcp/                             # v0.2
+│   └── tui/                             # later
+└── tests/                               # future
 ~~~
 
-Directories marked `future` are illustrative: do not create empty scaffolding purely to match the diagram.
+Illustrative only; create files when implementing features rather than unused empty stubs.
 
-## 8. Technology choices (tentative)
+## 8. Technology choices (committed direction, pending implementation)
 
-| Concern | Initial direction |
+| Concern | Direction |
 | --- | --- |
-| Runtime | Python 3.12+ with asyncio |
-| Project management | uv, pyproject.toml |
-| Basic CLI | Typer |
-| Terminal formatting | Rich |
-| Advanced TUI | Textual (later) |
-| Data contracts | Pydantic |
-| Agent loop | Custom, with optional future LangGraph integration |
-| Model integration | Provider-specific adapters behind a common protocol |
-| Persistence | SQLite |
-| Browser control | Playwright (later) |
-| Desktop control | Optional isolated computer-use adapters (later) |
-| Remote/sandbox execution | Local permissions first; Docker/VM later |
-| Extensibility | MCP, skills and repository instructions (after MVP) |
+| Runtime language | Python 3.12+ and asyncio |
+| Agent harness | **LangChain Deep Agents** (`deepagents`) |
+| Graph execution / checkpointing | **LangGraph** (as used by Deep Agents) |
+| Model abstraction | **LangChain** chat model integrations |
+| CLI | Typer + Rich live activity feed |
+| Rich TUI | Textual after reliable CLI streaming |
+| Activity stream | CodeMisterio event normalizer + file/process evidence |
+| Validation and schemas | Pydantic, Git, test runners |
+| Session persistence | LangGraph checkpointer; separate CodeMisterio activity journal (SQLite where useful) |
+| Shell/filesystem | Deep Agents backends + instrumented policy guards |
+| MCP | Client adapters via LangChain/Deep Agents extension points (v0.2) |
+| Browser control | Playwright (v0.3) |
+| Desktop computer use | Optional LangGraph CUA integration / isolated VM (v0.3+) |
+| Sandbox isolation | Explicitly scoped tools; Docker/VM as optional later environments |
+| Packaging | uv + pyproject.toml |
 
-No framework should be adopted merely to claim feature parity. Evaluate dependencies for maintenance burden, license compatibility, portability and security before merging.
+**Do not write a second general-purpose agent loop.** Our differentiation is the transparent CLI, coding-oriented tools, verified operation tracking and extensible execution experience.
 
 ## 9. Testing and observability strategy
 
-- Unit tests: event normalization, permission decisions, path containment, patch application, session serialization, context budgets.
-- Integration tests: local fixture repositories; fake model adapters; tool execution and interruption.
+**Release blocker:** live step-by-step CLI activity and evidence-backed diff events are required in v0.1; see [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md).
+
+
+- Unit tests: LangGraph-to-ActivityEvent normalization, file diff hunks/line numbers, process events, permissions, path containment and redaction.
+- Integration tests: Deep Agents with deterministic fake LangChain models, fixture repositories, tool execution streaming, interruption and checkpoint/resume.
 - Provider contract tests: opt-in, recorded fixtures where possible; never require paid API access for default CI.
 - End-to-end tests: small code-edit tasks with deterministic success criteria.
 - Computer-use tests: isolated test websites and VMs; screenshots and safe fake accounts only.
@@ -301,5 +291,7 @@ These should be resolved by implementation experience, not speculative abstracti
 - MCP trust boundaries and third-party skill installation.
 - CLI naming and distributable package metadata.
 - Open-source license choice (the repository currently has no LICENSE).
+- Tested version compatibility and extension points for Deep Agents/LangGraph event streaming.
+- Controlled process lifecycle and distinguishing verified restarts from unverified shell claims.
 
-See [PLAN.md](PLAN.md) for milestone gates, [docs/TOOLS.md](docs/TOOLS.md) for built-in tools, [docs/MCP.md](docs/MCP.md) for server integration, and [AGENTS.md](AGENTS.md) for coding-agent instructions.
+See [PLAN.md](PLAN.md) for milestone gates, [docs/ACTIVITY_STREAM.md](docs/ACTIVITY_STREAM.md) for live CLI events, [docs/TOOLS.md](docs/TOOLS.md) for tool integration, [docs/MCP.md](docs/MCP.md) for server integration, and [AGENTS.md](AGENTS.md) for coding-agent instructions.
