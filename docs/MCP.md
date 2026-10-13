@@ -2,7 +2,7 @@
 
 > **Status:** Planned feature, targeted for v0.2. Configuration and CLI commands below are illustrative, not implemented.
 
-CodeMisterio will act as a **Model Context Protocol (MCP) client**. Users will connect external MCP servers to expand available tools, resources, and prompts while retaining CodeMisterio's independent authorization, context budget and audit controls.
+CodeMisterio will act as a **Model Context Protocol (MCP) client integrated into LangChain Deep Agents**. Users will connect external MCP servers to expand available tools, resources, and prompts while retaining CodeMisterio's independent authorization, context budget, verified activity stream and audit controls.
 
 Official MCP references:
 - [Specification](https://modelcontextprotocol.io/specification)
@@ -15,7 +15,7 @@ The 2026-07-28 specification revised core message flow and transport behavior; c
 
 **v0.1: foundation only**
 
-- Unify built-in tool registration, schemas, dispatch, permission checks, cancellation, and structured results.
+- Integrate Deep Agents built-ins and CodeMisterio tools via one consistent adapter/policy layer; stream their execution events and verified side effects.
 - Define the extension points MCP will use without requiring an MCP server to run coding tasks.
 
 **v0.2: working MCP client**
@@ -23,7 +23,8 @@ The 2026-07-28 specification revised core message flow and transport behavior; c
 - Configure, enable/disable, list and inspect approved MCP servers.
 - Connect to **local stdio** servers, starting subprocesses under a controlled environment.
 - Connect to **remote Streamable HTTP** MCP endpoints over configured URLs.
-- Discover tools, validate arguments, dispatch calls and return normalized model-visible results.
+- Discover tools and expose them to Deep Agents using supported LangChain/Deep Agents tool extension points; validate arguments, dispatch calls and return normalized results.
+- Emit MCP connection/tool invocation/result events to the same CodeMisterio activity feed, including server identity, approval decisions, status and duration.
 - Support MCP resources and prompts as separate, explicit features with their own trust and context policy.
 - Handle protocol/SDK version compatibility, connection timeouts, server failures and safe shutdown.
 - Support credentials supplied through environment/key storage for local servers and authenticated HTTP where SDK capabilities permit; advanced interactive OAuth flows may need staged delivery.
@@ -159,4 +160,4 @@ MCP servers are independently executable programs or remote services: installing
 
 **Acceptance demo:** A user explicitly enables an example local server and a remote test server. CodeMisterio lists their tools, safely invokes an approved tool through its normal agent loop, refuses an unauthorized operation, and continues working if one MCP server disconnects.
 
-See [TOOLS.md](TOOLS.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md) for the core tool and permission architecture.
+See [TOOLS.md](TOOLS.md), [ACTIVITY_STREAM.md](ACTIVITY_STREAM.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md) for tool, event and Deep Agents integration architecture.
