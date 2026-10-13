@@ -83,7 +83,30 @@ CLI renderer (Rich; advanced TUI later)
 
 ### LangGraph stream inputs
 
-LangGraph supports streamed graph updates, model output and custom runtime updates. Build against **tested library versions**; prefer the current typed event-streaming API where suitable or `astream(..., stream_mode=["updates","messages","custom"], version="v2")` as a documented compatibility implementation. Inspect supported subgraph namespaces and actual event structures in tests.
+LangGraph supports streamed graph updates, model output and custom runtime updates. **Preferred implementation:** the current LangGraph typed event streaming API (`astream_events(..., version="v3")`, with a tested compatible LangGraph release). It exposes `tools` events including `tool-started`, `tool-output-delta`, `tool-finished` and `tool-error`, alongside `lifecycle`, `messages`, `custom`, and subgraph state. Protocol event sequence numbers and tool-call IDs allow ordering and correlation. For older version compatibility, use `astream(..., stream_mode=["updates","messages","custom"], version="v2")` and instrument tool starts/completions directly.
+
+Conceptual stream bridge (verify with pinned dependencies before implementation):
+
+~~~python
+from deepagents import create_deep_agent
+
+agent = create_deep_agent(model=model, backend=instrumented_backend)
+
+stream = await agent.astream_events(
+    {"messages": [{"role": "user", "content": task}]},
+    version="v3",
+)
+async for event in stream:
+    if event["method"] == "tools":
+        await activity_bridge.on_tool_event(event)  # statuses, stdout deltas
+    elif event["method"] in {"lifecycle", "custom"}:
+        await activity_bridge.on_runtime_event(event)
+
+# Real file hunks and process/restart evidence come from
+# instrumented_backend/process_manager, not the LLM stream.
+~~~
+
+The above is an **integration sketch**, not yet executable CodeMisterio source. Inspect supported subgraph namespaces and actual event structures in tests.
 
 - `messages`: stream model output or user-facing progress, **not hidden chain-of-thought**.
 - `updates` / `tasks`: graph-node transitions, todo updates, subagent activity and execution status where available.
@@ -234,6 +257,9 @@ Observability is a **cross-cutting requirement**, not an agent prompt. Add instr
 **v0.1 scope:** managed process start/stop/restart tracking and honest health reporting are required for the core CLI; support for arbitrary unmanaged processes can arrive later. Always label untracked background process changes as unverified.
 
 ## 10. Reference projects
+
+- [LangGraph typed event streaming](https://docs.langchain.com/oss/python/langgraph/event-streaming) — recommended v3 API, including tools/lifecycle events.
+
 
 - [Deep Agents](https://github.com/langchain-ai/deepagents) — create_deep_agent, backends, tool middleware, subagents.
 - [LangGraph streaming](https://docs.langchain.com/oss/python/langgraph/streaming) — updates/messages/custom and typed event streaming.
