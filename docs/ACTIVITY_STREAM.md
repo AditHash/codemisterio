@@ -231,7 +231,7 @@ Observability is a **cross-cutting requirement**, not an agent prompt. Add instr
 - [ ] `--format jsonl` output is parseable; versioned schema can be replayed.
 - [ ] Final summary is derived from events plus independently checked Git status/test results, not LLM claims.
 
-**Milestone split:** minimal process start/stop/restart tracking may ship incrementally after baseline v0.1; exact process restart reporting is mandatory before the CLI advertises verified service lifecycle events. The v0.1 release must honestly label untracked background commands as unverified.
+**v0.1 scope:** managed process start/stop/restart tracking and honest health reporting are required for the core CLI; support for arbitrary unmanaged processes can arrive later. Always label untracked background process changes as unverified.
 
 ## 10. Reference projects
 
