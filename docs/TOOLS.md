@@ -2,20 +2,21 @@
 
 > **Status:** Design specification. None of the tools below are shipped merely because they are listed here. Milestone assignments are targets, not release promises.
 
-CodeMisterio is a coding **harness**, not just a text generator. Useful built-in tools must work without requiring users to install third-party MCP servers. External MCP tools complement the built-ins; they do not replace them.
+CodeMisterio is a coding **CLI built on LangChain Deep Agents**, not just a text generator. Use Deep Agents filesystem, search, shell and planning tools wherever appropriate; add CodeMisterio wrappers/tools only for missing capabilities, policy enforcement and verified event reporting. Useful coding tools must work without requiring users to install third-party MCP servers. External MCP tools complement the built-ins; they do not replace them.
 
 ## 1. Shared tool execution interface
 
 Every built-in or MCP-discovered tool passes through this pipeline:
 
 ~~~text
-Model tool call
+Deep Agents tool call
   -> canonical name + JSON Schema argument validation
   -> availability and capability check
   -> permission + workspace/sandbox policy
   -> bounded executor (timeout, output size, cancellation)
-  -> normalized result + audit event
-  -> model observation and CLI display
+  -> before/after evidence capture (diffs, exit status, process state)
+  -> normalized result + correlated ActivityEvent
+  -> model observation + **live CLI activity display**
 ~~~
 
 Tool specifications should declare: stable ID/name, provider-agnostic description, JSON Schema, permissions and resource scope, idempotency/retry safety, source (built-in or server ID), and supported execution environment. Tool results include call ID, status, duration, structured output or bounded text, and optionally named artifacts. Tools must not be invoked based on unvalidated model-generated arguments.
@@ -28,7 +29,9 @@ Tool specifications should declare: stable ID/name, provider-agnostic descriptio
 - Permission checks follow the actual operation, not the text of a tool description.
 - Tool calls are not inherently safe because a remote MCP server labeled them “read-only.”
 
-## 2. Required built-in tools: v0.1
+## 2. Required coding-tool capabilities: v0.1
+
+Implement these with **Deep Agents built-ins and instrumented backends when possible**, and CodeMisterio tools only when those are insufficient. Names below are conceptual CodeMisterio IDs, not a claim that they are the literal Deep Agents tool names.
 
 | Category | Proposed tools | Behavior |
 | --- | --- | --- |
@@ -38,8 +41,14 @@ Tool specifications should declare: stable ID/name, provider-agnostic descriptio
 | Shell | `shell.run` | Run bounded development commands with working directory, timeout, exit code, stdout/stderr, cancellation |
 | Git | `git.status`, `git.diff`, `git.log` | Read repository state, staged/unstaged changes and recent history |
 | Tests | `tests.run` | Discover or invoke a selected test command and return machine-readable verification evidence |
+| Managed processes | `process.start`, `process.stop`, `process.restart`, `process.health` | Track actual process lifecycle, PID, output and independent readiness checks |
+| Live events | `activity.stream` (internal bridge, not model tool) | Render verified creates/edits/deletes, actual diff lines, process lifecycle, command output and status |
 
 ### v0.1 behaviors
+
+- **Activity streaming is mandatory:** before/after instrumented filesystem writes, accurate unified-diff hunks/line numbers, command output, process lifecycle and explicit failures. Consult [ACTIVITY_STREAM.md](ACTIVITY_STREAM.md).
+- Deep Agents graph/tool events are not automatically evidence of actual changes. Capture file/process effects at the backend/executor boundary.
+- The raw Deep Agents host shell backend is not isolated: configure real command safety/approvals and treat virtual path settings as insufficient sandboxing.
 
 - All file access is scoped to the selected workspace by default. Resolve paths and symlinks before enforcing boundaries.
 - Search ignores generated/large files and respects ignore rules by default; allow explicit safe override for relevant files.
@@ -116,4 +125,4 @@ A tool is ready only when it has:
 4. Safe behavior on dirty worktrees and workspace escapes where relevant.
 5. A result contract consumed by both model adapter and CLI, including clear failure states.
 
-See [../PLAN.md](../PLAN.md) for release gates and [MCP.md](MCP.md) for extension support.
+See [../PLAN.md](../PLAN.md) for release gates, [ACTIVITY_STREAM.md](ACTIVITY_STREAM.md) for real-time verified events and [MCP.md](MCP.md) for extension support.
