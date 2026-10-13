@@ -6,7 +6,7 @@
 
 Build a trustworthy, local-first, open-source-intended **agentic coding CLI** with a replaceable model layer and a CodeMisterio-owned harness. The first test of success is whether it can take a small repository task, inspect and modify relevant files, execute verification, and accurately report what happened.
 
-The core loop and permission model take priority over elaborate TUI, subagents and desktop automation.
+The core loop and permission model take priority over elaborate TUI, subagents and desktop automation. **A useful built-in toolset ships in v0.1; MCP server integration is a committed v0.2 milestone.** Both share one tool registry and permission pipeline.
 
 ## Guiding release rules
 
@@ -51,9 +51,11 @@ The core loop and permission model take priority over elaborate TUI, subagents a
 ### Tools and safe editing
 
 - [ ] Resolve a repository root and operate within an explicit workspace.
-- [ ] Implement file list/read, repo search and structured patch application.
-- [ ] Implement bounded shell commands for tests, builds and linting.
-- [ ] Show Git status and diff, and preserve unrelated user edits.
+- [ ] Implement built-ins: `files.list`, `files.read`, `files.stat`, `search.glob`, `search.grep`, `patch.apply`, `files.write`.
+- [ ] Implement bounded `shell.run` and `tests.run` with stdout/stderr, timeout, cancellation and exit status.
+- [ ] Implement read-only `git.status`, `git.diff` and `git.log`; preserve unrelated user edits.
+- [ ] Implement the unified tool registry **now**: canonical tool names, JSON Schema validation, permission classifications and structured results.
+- [ ] Publish basic tool help/listing; external MCP tools use the same registry in v0.2.
 - [ ] Add an approval gate for writes, risky commands and network side effects.
 - [ ] Block unauthorized access outside workspace, including symlink/path traversal.
 - [ ] Present an accurate final summary: files changed, commands run, tests passed/failed/not run.
@@ -87,12 +89,18 @@ The milestone is complete only when this workflow passes repeatably in automated
 - [ ] Add SQLite-backed session history with versioned migrations.
 - [ ] Implement context selection, budgets, compaction and recovery of interrupted sessions.
 - [ ] Add `AGENTS.md` repository instruction loading with explicit untrusted-content handling.
-- [ ] Introduce a tool registry with discoverable schemas and permission metadata.
-- [ ] Add MCP client support with user-approved server configuration and clear trust boundaries.
+- [ ] Extend the existing tool registry with useful built-ins: safe file move/delete, controlled Git branch/stage/commit, project inspection, diagnostics (lint/typecheck), and bounded HTTP fetch.
+- [ ] Build MCP server management: configure, list, inspect, enable/disable and remove servers.
+- [ ] Support local MCP servers over **stdio** and remote servers over **Streamable HTTP** using a maintained Python MCP SDK.
+- [ ] Discover/invoke MCP tools through the same validation, permissions, budgets and audit pipeline as built-in tools; namespace IDs by server.
+- [ ] Support MCP resources and prompts as lower-trust content with explicit loading and context limits.
+- [ ] Handle MCP credentials safely, connection failures, timeouts, protocol-version negotiation and server process cleanup.
+- [ ] Add fake MCP server tests plus opt-in real-server compatibility checks; isolate untrusted servers.
+- [ ] Keep OAuth UX and additional MCP extension features incremental where the core SDK/transport makes full support complex.
 - [ ] Add reusable skills or task templates without silently executing downloaded instructions.
 - [ ] Add token/cost tracking when providers expose reliable usage information.
 
-**Gate:** the same coding task works on at least two providers; resume does not duplicate non-idempotent operations; untrusted tool output cannot bypass permissions.
+**Gate:** the same coding task works on at least two providers; resume does not duplicate non-idempotent operations; an explicitly approved local MCP server and a remote MCP server can expose tools through the shared registry, while unauthorized actions are rejected. A disconnecting server does not break core coding tasks.
 
 ## Milestone 3 — v0.3: Browser and computer use
 
@@ -125,6 +133,21 @@ The milestone is complete only when this workflow passes repeatably in automated
 
 **Gate:** improve task completion on a fixed benchmark without increasing unauthorized operations or hidden regressions.
 
+## Milestone 5 — v1.0: Stable, distributable CLI
+
+**Scope:** harden and publish the capabilities proved in earlier milestones rather than expanding scope indefinitely.
+
+- [ ] Select and publish a compatible OSI-approved license before marketing the software as open source.
+- [ ] Run repeatable cross-platform CI on supported Windows, macOS and Linux versions.
+- [ ] Stabilize provider and tool interfaces, documented config migrations, and session format.
+- [ ] Security review of shell tools, path containment, MCP server trust and credential handling.
+- [ ] Publish honest install/upgrade guidance, docs, compatibility matrix, examples and troubleshooting.
+- [ ] Add releases/packages with signed or verifiable distribution where practical.
+- [ ] Maintain an end-to-end coding benchmark and release-blocking regression tests.
+- [ ] Document extension APIs and supported MCP transport versions.
+
+**Gate:** clean install, reliable core editing/testing and supported MCP workflows on advertised platforms; no known critical sandbox/permission escapes; public release documentation matches actual behavior.
+
 ## Backlog (not commitments)
 
 - Local model support via Ollama or OpenAI-compatible inference endpoints.
@@ -154,6 +177,8 @@ The milestone is complete only when this workflow passes repeatably in automated
 6. **Implement first provider adapter** — tool calling plus a real smoke-test script.
 7. **Create bug-fixing benchmark fixture** — Python + pytest, clean and dirty worktree cases.
 8. **Document reproducible v0.1 demo** — accurate flags, limitations and results.
+9. **Design v0.2 MCP compatibility suite** — fake stdio + HTTP servers, tools/resources/prompts, malformed responses and approval denials.
+10. **Plan v0.2 tool expansion** — diagnostics, project inspection and controlled Git mutation.
 
 ## Definition of done for any feature
 
@@ -164,4 +189,4 @@ The milestone is complete only when this workflow passes repeatably in automated
 - Changes respect the workspace boundary and preserve unrelated edits.
 - New dependencies have a clear reason and compatible licensing.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries and [AGENTS.md](AGENTS.md) for contributor-agent guidance.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system boundaries, [docs/TOOLS.md](docs/TOOLS.md) for the built-in tool catalog, [docs/MCP.md](docs/MCP.md) for the MCP client contract, and [AGENTS.md](AGENTS.md) for contributor-agent guidance.
