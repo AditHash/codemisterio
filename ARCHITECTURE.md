@@ -19,6 +19,7 @@ Primary interface: terminal CLI; optional rich TUI. Headless automation, IDE int
 5. **Local-first and inspectable:** users can see proposed edits, tool calls, approvals, and session state.
 6. **Evidence over confidence:** test results, diffs, logs, and reproducible steps support claims.
 7. **Incremental delivery:** one reliable agent loop precedes subagents, remote sandboxes, and desktop control.
+8. **Built-ins plus MCP:** first-class coding tools and MCP-discovered tools run through one registry, permission engine and result contract.
 
 ## 3. System overview
 
@@ -41,7 +42,7 @@ CLI command + session controller
       Model adapters       Tool execution
       - OpenAI             - repo files/search/patch
       - Anthropic          - shell/Git/build/tests
-      - Gemini (later)     - MCP (later)
+      - Gemini (later)     - MCP client (v0.2)
       - Ollama (later)     - browser (later)
                            - desktop (later)
               |                  |
@@ -127,20 +128,51 @@ Treat *native computer-use APIs*, reasoning traces, prompt caching, and model-sp
 
 ### Tool layer
 
-Tools are registered with a canonical name, schema, permissions, execution context, and bounded result format. Proposed baseline:
+Tools are registered with a canonical name, schema, permissions, execution context, provenance, and bounded result format. A **unified tool registry** is part of v0.1; the MCP client extends it in v0.2. Proposed baseline:
 
 | Tool | Purpose | Risk consideration |
 | --- | --- | --- |
-| `files.list`, `files.read` | Inspect repository content | Workspace and symlink boundary |
-| `search.code` | Search repository using available local tooling | Time and output limits |
-| `files.patch` | Apply targeted patches | Review diffs; limit writable paths |
-| `shell.run` | Build, lint, run tests and inspect processes | Explicit policy; sandbox; timeouts |
-| `git.status`, `git.diff` | Inspect changes | Avoid unintended mutations |
-| `git.commit` | Commit approved changes | Explicit opt-in |
+| `files.list`, `files.read`, `files.stat` | Inspect repository content | Workspace and symlink boundary |
+| `search.glob`, `search.grep` | Search files and content deterministically | Time, ignore rules and output limits |
+| `patch.apply`, `files.write` | Apply targeted patches and create/update files | Approval; avoid overwriting user changes |
+| `shell.run`, `tests.run` | Build, lint, run tests and inspect processes | Explicit policy; sandbox; timeouts |
+| `git.status`, `git.diff`, `git.log` | Inspect changes and history | Preserve unrelated mutations |
+| `git.branch`, `git.commit` (v0.2) | Controlled Git mutation | Explicit opt-in |
+| `diagnostics.*`, `project.inspect` (v0.2) | Lint, typecheck, inspect manifests | Respect execution policy |
+| `mcp.<server-id>.<tool-name>` (v0.2) | External server-provided tools | Server and per-tool approval; untrusted output |
 | `browser.*` (later) | Playwright and visual UI testing | Browser profile, network and credentials |
 | `desktop.*` (later) | Screenshots, mouse and keyboard | Highly privileged; explicit opt-in |
 
 Use structured patching over whole-file replacement when appropriate. Avoid granting arbitrary shell access to an agent solely because a tool was registered.
+
+For complete built-in tool contracts, see [docs/TOOLS.md](docs/TOOLS.md).
+
+### MCP client (target: v0.2)
+
+CodeMisterio acts as an MCP **client**, connecting to user-approved servers; the MCP server's tool definitions do not bypass the harness's own policy.
+
+- Support local `stdio` and remote **Streamable HTTP** transports with a maintained Python SDK.
+- Use namespaced stable IDs (`mcp.<server-id>.<tool-name>`) to prevent collision with built-ins or other servers.
+- Support tool discovery and invocation; expose resources and prompts via explicit lower-trust context interfaces.
+- Separate MCP configuration, process lifecycle, connection status, authentication, and per-call permission enforcement.
+- Do not auto-execute project-supplied server configuration, downloaded packages, or hidden remote endpoints.
+- Bound outputs, timeouts and retries; side-effecting calls are not blindly retried on disconnect.
+- Respect protocol version negotiation. The MCP 2026-07-28 specification changed behavior relative to earlier deployments; validate compatibility with tests.
+- Treat remote HTTP credentials and local child-process environments as sensitive; never print tokens or pass unrestricted host environment variables.
+
+Conceptually:
+
+~~~text
+Agent loop
+    -> unified registry (built-in + MCP adapters)
+    -> argument validation
+    -> permission engine
+    -> executor / MCP client
+    -> normalized ToolResult
+    -> model context + CLI event
+~~~
+
+See [docs/MCP.md](docs/MCP.md) for server management, transports, authentication, and acceptance tests.
 
 ### Context and memory
 
@@ -172,6 +204,8 @@ Proposed policy:
 | Install packages or arbitrary shell commands | Ask |
 | Read secrets, private files outside workspace | Deny unless explicitly authorized and safe |
 | Network requests, authentication, publishing, pushing Git | Ask |
+| MCP server installation/launch and remote connection | Explicitly approve server command/origin and scoped access |
+| MCP tool invocation | Evaluate actual effect per call; untrusted server metadata does not grant permission |
 | Delete broadly, overwrite unrelated work, elevated privileges | Ask or deny based on policy |
 | Browser control | Opt-in, isolated browser session |
 | Full desktop control | Off by default; prefer isolated VM |
@@ -268,4 +302,4 @@ These should be resolved by implementation experience, not speculative abstracti
 - CLI naming and distributable package metadata.
 - Open-source license choice (the repository currently has no LICENSE).
 
-See [PLAN.md](PLAN.md) for milestone gates and [AGENTS.md](AGENTS.md) for instructions to coding agents working in this repository.
+See [PLAN.md](PLAN.md) for milestone gates, [docs/TOOLS.md](docs/TOOLS.md) for built-in tools, [docs/MCP.md](docs/MCP.md) for server integration, and [AGENTS.md](AGENTS.md) for coding-agent instructions.
