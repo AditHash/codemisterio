@@ -8,6 +8,26 @@ Build a trustworthy, local-first, open-source-intended **agentic coding CLI powe
 
 **Real-time, verifiable step-by-step CLI output is a v0.1 requirement**, not a future UI enhancement. A useful built-in coding toolset ships in v0.1; MCP server integration remains a committed v0.2 milestone. All tools pass one permission and activity-reporting pipeline.
 
+## Implementation checkpoint — initial CLI branch
+
+The first v0.1 foundation is available on `feat/initial-deepagents-cli`, but **v0.1 is not complete**.
+
+- [x] Python package metadata, CLI entry point, `version` and `run` commands.
+- [x] Deep Agents `create_deep_agent` construction with composite workspace backend and read/search tool surface (not yet verified against installed dependencies).
+- [x] Optional write/edit tools with human-in-the-loop approval flow (offline tests cover rejection; real model test pending).
+- [x] LangGraph v3 event normalizer for tool lifecycle and assistant text output.
+- [x] Bounded observed UTF-8 workspace snapshots for created/modified/deleted files and actual changed-line positions.
+- [x] JSONL output and Rich event renderer.
+- [x] Offline unit tests (12 passed locally on Python 3.13).
+- [x] Python 3.12/3.13 GitHub Actions workflow committed (workflow result pending).
+- [ ] Install/test Deep Agents + LangChain dependencies and complete a real provider smoke test.
+- [ ] Add instrumented filesystem backend writes with true tool attribution and stronger secret protection.
+- [ ] Add sandboxed/approved shell, test execution and verified managed process lifecycle.
+- [ ] Add persistent sessions, cancellation handling and robust stream retry behavior.
+- [ ] Build MCP client/server management in v0.2.
+
+See [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) for preview limitations.
+
 ## Guiding release rules
 
 - Every milestone must be independently useful and demoable.
